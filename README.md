@@ -1,10 +1,10 @@
-# rt
+# [@fartlabs/rt](https://jsr.io/@fartlabs/rt)
 
-[![JSR][JSR badge]][JSR] [![JSR score][JSR score badge]][JSR score]
 [![GitHub
 Actions][GitHub Actions badge]][GitHub Actions]
 
-Minimal HTTP router library based on the `URLPattern` API.
+Minimal HTTP router library based on the
+[`URLPattern` API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API).
 
 ## Usage
 
