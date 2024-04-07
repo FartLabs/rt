@@ -55,6 +55,13 @@ export interface Handle<T extends string = string> {
 }
 
 /**
+ * ErrorHandle is called to handle an error.
+ */
+export interface ErrorHandle {
+  (error: Error): Promise<Response> | Response;
+}
+
+/**
  * Route represents a the pairing of a matcher and a handler.
  */
 export interface Route<T extends string = string> {
@@ -114,71 +121,78 @@ type RouterInterface = Record<
 export class Router implements RouterInterface {
   public routes: Routes = [];
   public defaultHandle?: Handle;
+  public errorHandle?: ErrorHandle;
 
   /**
    * fetch invokes the router for the given request.
    */
   public async fetch(request: Request, i = 0): Promise<Response> {
-    const url = new URL(request.url);
-    while (i < this.routes.length) {
-      const route = this.routes[i];
-      const matchedMethod = route.match === undefined ||
-        typeof route.match !== "function" &&
-          (route.match.method === undefined ||
-            route.match.method === request.method);
-      if (!matchedMethod) {
+    try {
+      const url = new URL(request.url);
+      while (i < this.routes.length) {
+        const route = this.routes[i];
+        const matchedMethod = route.match === undefined ||
+          typeof route.match !== "function" &&
+            (route.match.method === undefined ||
+              route.match.method === request.method);
+        if (!matchedMethod) {
+          i++;
+          continue;
+        }
+
+        const matchedFn = typeof route.match === "function" &&
+          await route.match({ request, url });
+        const matchedPattern = route.match !== undefined &&
+          typeof route.match !== "function" &&
+          route.match.pattern !== undefined &&
+          route.match.pattern.exec(request.url);
+        let params: Record<string, string> = {};
+        if (matchedPattern) {
+          params = matchedPattern?.pathname
+            ? Object.entries(matchedPattern.pathname.groups)
+              .reduce(
+                (groups, [key, value]) => {
+                  if (value !== undefined) {
+                    groups[key] = value;
+                  }
+
+                  return groups;
+                },
+                {} as { [key: string]: string },
+              )
+            : {};
+        }
+
+        // If the route matches, call it and return the response.
+        if (route.match === undefined || matchedFn || matchedPattern) {
+          return await route.handle({
+            request,
+            url,
+            params,
+            next: () => this.fetch(request, i + 1),
+          });
+        }
+
         i++;
-        continue;
       }
 
-      const matchedFn = typeof route.match === "function" &&
-        await route.match({ request, url });
-      const matchedPattern = route.match !== undefined &&
-        typeof route.match !== "function" &&
-        route.match.pattern !== undefined &&
-        route.match.pattern.exec(request.url);
-      let params: Record<string, string> = {};
-      if (matchedPattern) {
-        params = matchedPattern?.pathname
-          ? Object.entries(matchedPattern.pathname.groups)
-            .reduce(
-              (groups, [key, value]) => {
-                if (value !== undefined) {
-                  groups[key] = value;
-                }
-
-                return groups;
-              },
-              {} as { [key: string]: string },
-            )
-          : {};
-      }
-
-      // If the route matches, call it and return the response.
-      if (route.match === undefined || matchedFn || matchedPattern) {
-        return await route.handle({
+      if (this.defaultHandle !== undefined) {
+        return await this.defaultHandle({
           request,
           url,
-          params,
-          next: () => this.fetch(request, i + 1),
+          params: {},
+          next: () => {
+            throw new Error("next() called from default handler");
+          },
         });
       }
-
-      i++;
+    } catch (error) {
+      if (this.errorHandle !== undefined) {
+        return await this.errorHandle(error);
+      }
     }
 
-    if (this.defaultHandle !== undefined) {
-      return await this.defaultHandle({
-        request,
-        url,
-        params: {},
-        next: () => {
-          throw new Error("next() called from default handler");
-        },
-      });
-    }
-
-    throw new Error("Not found");
+    return new Response("Internal Server Error", { status: 500 });
   }
 
   /**
@@ -222,6 +236,14 @@ export class Router implements RouterInterface {
    */
   public default(handle: Handle | undefined): this {
     this.defaultHandle = handle;
+    return this;
+  }
+
+  /**
+   * error sets the router's error handler.
+   */
+  public error(handle: ErrorHandle | undefined): this {
+    this.errorHandle = handle;
     return this;
   }
 
