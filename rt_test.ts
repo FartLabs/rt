@@ -23,3 +23,41 @@ Deno.test("createRouter navigates unmatched route to default handler", async () 
   );
   assertEquals(response.status, 404);
 });
+
+const statefulRouter = createRouter(
+  (r) =>
+    r
+      .get(
+        "/*",
+        async (ctx) => {
+          ctx.state.user = { name: "Alice" };
+          return await ctx.next();
+        },
+      )
+      .get<"name">(
+        "/:name",
+        (ctx) => {
+          if (ctx.state.user === null) {
+            return new Response("Unauthorized", { status: 401 });
+          }
+
+          if (ctx.state.user.name !== ctx.params.name) {
+            return new Response("Forbidden", { status: 403 });
+          }
+
+          return new Response(`Hello, ${ctx.params.name}!`);
+        },
+      ),
+  (): { user: User | null } => ({ user: null }),
+);
+
+interface User {
+  name: string;
+}
+
+Deno.test("createRouter preserves state", async () => {
+  const response = await statefulRouter.fetch(
+    new Request("http://localhost/Alice"),
+  );
+  assertEquals(await response.text(), "Hello, Alice!");
+});
