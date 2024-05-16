@@ -1,8 +1,11 @@
 /**
  * createRouter creates a new router.
  */
-export function createRouter(fn?: (r: Router) => Router): Router {
-  const router = new Router();
+export function createRouter<T>(
+  fn?: (r: Router<T>) => Router<T>,
+  state?: RouterState<T>,
+): Router<T> {
+  const router = new Router<T>(state);
   if (fn) {
     return fn(router);
   }
@@ -34,7 +37,7 @@ export type Method = typeof METHODS[number];
  * Match is a type which matches a Request object.
  */
 export type Match =
-  | ((detail: { request: Request; url: URL }) => Promise<boolean>)
+  | ((r: RouterRequest) => boolean | Promise<boolean>)
   | {
     /**
      * pattern is the URL pattern to match on.
@@ -50,8 +53,8 @@ export type Match =
 /**
  * Handle is called to handle a request.
  */
-export interface Handle<T extends string = string> {
-  (ctx: RouterContext<T>): Promise<Response> | Response;
+export interface Handle<TParam extends string = string, TState = unknown> {
+  (ctx: RouterContext<TParam, TState>): Promise<Response> | Response;
 }
 
 /**
@@ -62,43 +65,47 @@ export interface ErrorHandle {
 }
 
 /**
+ * DefaultHandle is called to handle a request when no routes are matched.
+ */
+type DefaultHandle<TState> = Handle<never, TState>;
+
+/**
  * Route represents a the pairing of a matcher and a handler.
  */
-export interface Route<T extends string = string> {
-  /**
-   * handle is called to handle a request.
-   */
-  handle: Handle<T>;
-
+export interface Route<TParam extends string = string, TState = unknown> {
   /**
    * match is called to match a request.
    */
   match?: Match;
+
+  /**
+   * handle is called to handle a request.
+   */
+  handle: Handle<TParam, TState>;
 }
 
 /**
  * Routes is a sequence of routes.
  */
-export type Routes<T extends string = string> = Route<T>[];
+export type Routes<TParam extends string = string, TState = unknown> = Array<
+  Route<TParam, TState>
+>;
 
 /**
  * RouterContext is the object passed to a router.
  */
-export interface RouterContext<T extends string> {
-  /**
-   * request is the original request object.
-   */
-  request: Request;
-
-  /**
-   * url is the parsed fully qualified URL of the request.
-   */
-  url: URL;
-
+export interface RouterContext<TParam extends string, TState>
+  extends RouterRequest {
   /**
    * params is a map of matched parameters from the URL pattern.
    */
-  params: { [key in T]: string };
+  params: { [key in TParam]: string };
+
+  /**
+   * state is the state passed to the router. Modify this to pass data between
+   * routes.
+   */
+  state: TState;
 
   /**
    * next executes the next matched route in the sequence. If no more routes are
@@ -108,27 +115,54 @@ export interface RouterContext<T extends string> {
 }
 
 /**
+ * RouterRequest is the object passed to a router.
+ */
+interface RouterRequest {
+  /**
+   * request is the original request object.
+   */
+  request: Request;
+
+  /**
+   * url is the parsed fully qualified URL of the request.
+   */
+  url: URL;
+}
+
+/**
+ * RouterState is the state passed to a router.
+ */
+type RouterState<T> = (r: RouterRequest) => T;
+
+/**
  * RouterInterface is the interface for a router.
  */
-type RouterInterface = Record<
+type RouterInterface<T> = Record<
   Lowercase<Method>,
-  ((pattern: string, handle: Handle) => Router)
+  ((pattern: string, handle: Handle) => Router<T>)
 >;
 
 /**
  * Router is an HTTP router based on the `URLPattern` API.
  */
-export class Router implements RouterInterface {
-  public routes: Routes = [];
-  public defaultHandle?: Handle;
+export class Router<T> implements RouterInterface<T> {
+  public routes: Routes<string, T> = [];
+  public defaultHandle?: DefaultHandle<T>;
   public errorHandle?: ErrorHandle;
+
+  public constructor(public readonly state?: RouterState<T>) {}
 
   /**
    * fetch invokes the router for the given request.
    */
-  public async fetch(request: Request, i = 0): Promise<Response> {
+  public async fetch(
+    request: Request,
+    url: URL = new URL(request.url),
+    state: T =
+      (this.state !== undefined ? this.state({ request, url }) : {}) as T,
+    i = 0,
+  ): Promise<Response> {
     try {
-      const url = new URL(request.url);
       while (i < this.routes.length) {
         const route = this.routes[i];
         const matchedMethod = route.match === undefined ||
@@ -169,7 +203,8 @@ export class Router implements RouterInterface {
             request,
             url,
             params,
-            next: () => this.fetch(request, i + 1),
+            state,
+            next: () => this.fetch(request, url, state, i + 1),
           });
         }
 
@@ -181,6 +216,7 @@ export class Router implements RouterInterface {
           request,
           url,
           params: {},
+          state,
           next: () => {
             throw new Error("next() called from default handler");
           },
@@ -198,14 +234,14 @@ export class Router implements RouterInterface {
   /**
    * with appends a route to the router.
    */
-  public with<T extends string>(route: Route<T>): this;
-  public with<T extends string>(
+  public with<TParam extends string>(route: Route<TParam, T>): this;
+  public with<TParam extends string>(
     match: Match,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this;
-  public with<T extends string>(
-    routeOrMatch: Match | Route<T>,
-    handle?: Handle<T>,
+  public with<TParam extends string>(
+    routeOrMatch: Match | Route<TParam, T>,
+    handle?: Handle<TParam, T>,
   ): this {
     if (handle === undefined && "handle" in routeOrMatch) {
       this.routes.push(routeOrMatch);
@@ -221,7 +257,7 @@ export class Router implements RouterInterface {
   /**
    * use appends a sequence of routers to the router.
    */
-  public use(data: Routes | Router): this {
+  public use(data: Routes | Router<T>): this {
     if (data instanceof Router) {
       this.routes.push(...data.routes);
     } else {
@@ -234,7 +270,7 @@ export class Router implements RouterInterface {
   /**
    * default sets the router's default handler.
    */
-  public default(handle: Handle | undefined): this {
+  public default(handle: DefaultHandle<T> | undefined): this {
     this.defaultHandle = handle;
     return this;
   }
@@ -250,9 +286,9 @@ export class Router implements RouterInterface {
   /**
    * connect appends a router for the CONNECT method to the router.
    */
-  public connect<T extends string>(
+  public connect<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "CONNECT",
@@ -263,9 +299,9 @@ export class Router implements RouterInterface {
   /**
    * delete appends a router for the DELETE method to the router.
    */
-  public delete<T extends string>(
+  public delete<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "DELETE",
@@ -276,9 +312,9 @@ export class Router implements RouterInterface {
   /**
    * get appends a router for the GET method to the router.
    */
-  public get<T extends string>(
+  public get<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "GET",
@@ -289,9 +325,9 @@ export class Router implements RouterInterface {
   /**
    * head appends a router for the HEAD method to the router.
    */
-  public head<T extends string>(
+  public head<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "HEAD",
@@ -302,9 +338,9 @@ export class Router implements RouterInterface {
   /**
    * options appends a router for the OPTIONS method to the router.
    */
-  public options<T extends string>(
+  public options<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "OPTIONS",
@@ -315,9 +351,9 @@ export class Router implements RouterInterface {
   /**
    * patch appends a router for the PATCH method to the router.
    */
-  public patch<T extends string>(
+  public patch<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "PATCH",
@@ -328,9 +364,9 @@ export class Router implements RouterInterface {
   /**
    * post appends a router for the POST method to the router.
    */
-  public post<T extends string>(
+  public post<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "POST",
@@ -341,9 +377,9 @@ export class Router implements RouterInterface {
   /**
    * put appends a router for the PUT method to the router.
    */
-  public put<T extends string>(
+  public put<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "PUT",
@@ -354,9 +390,9 @@ export class Router implements RouterInterface {
   /**
    * trace appends a router for the TRACE method to the router.
    */
-  public trace<T extends string>(
+  public trace<TParam extends string>(
     pattern: string,
-    handle: Handle<T>,
+    handle: Handle<TParam, T>,
   ): this {
     return this.with({
       method: "TRACE",
