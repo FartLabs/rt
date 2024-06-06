@@ -61,3 +61,16 @@ Deno.test("createRouter preserves state", async () => {
   );
   assertEquals(await response.text(), "Hello, Alice!");
 });
+
+const nestedRouter = createRouter()
+  .get(
+    "/*",
+    (ctx) => statefulRouter.fetch(ctx.request),
+  );
+
+Deno.test("createRouter nests routers", async () => {
+  const response = await nestedRouter.fetch(
+    new Request("http://localhost/Alice"),
+  );
+  assertEquals(await response.text(), "Hello, Alice!");
+});
