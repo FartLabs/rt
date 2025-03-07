@@ -12,13 +12,13 @@ interface User {
 const router = new Router<State>()
   .get(
     "/*",
-    async (_request, _params, _info, next) => {
+    async ({ next }) => {
       return await next({ user: { name: "Wazoo" } });
     },
   )
   .get(
     "/:name",
-    (_request, params, _info, _next, state) => {
+    ({ params, state }) => {
       if (state.user === undefined) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -42,8 +42,7 @@ Deno.test("Router preserves state", async () => {
 const nestedRouter = new Router<State>()
   .get(
     "/*",
-    (response, _params, info, _next, state) =>
-      router.fetch(response, info, state),
+    ({ request, info, state }) => router.fetch(request, info, state),
   );
 
 Deno.test("Router nests routers", async () => {

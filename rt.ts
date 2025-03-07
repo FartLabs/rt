@@ -5,12 +5,16 @@ export interface RtRoute<TState> extends Omit<Route, "handler"> {
   handler: HandleRequest<TState>;
 }
 
+export interface RtContext<TState> {
+  request: Request;
+  params: URLPatternResult | undefined;
+  info: Deno.ServeHandlerInfo | undefined;
+  next: (state: TState) => Promise<Response>;
+  state: TState;
+}
+
 export type HandleRequest<TState> = (
-  request: Request,
-  params: URLPatternResult | undefined,
-  info: Deno.ServeHandlerInfo | undefined,
-  next: (state: TState) => Promise<Response>,
-  state: TState,
+  context: RtContext<TState>,
 ) => Response | Promise<Response>;
 
 export type HandleDefault = () => Response | Promise<Response>;
@@ -31,7 +35,7 @@ function handleError(error: Error) {
 export class Router<TState> {
   public constructor(
     public routes: RtRoute<TState>[] = [],
-    public initializeState = () => ({} as TState),
+    public initializeState: () => TState = () => ({} as TState),
     public handleDefault?: HandleDefault,
     public handleError?: HandleError,
   ) {}
@@ -82,7 +86,7 @@ export class Router<TState> {
           method,
           pattern,
           handler: (request, params, info) => {
-            return handler(request, params, info, next, state);
+            return handler({ request, params, info, next, state });
           },
         },
       ],

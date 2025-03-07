@@ -4,7 +4,7 @@ import { Router } from "./rt.ts";
 const router = new Router()
   .get(
     "/",
-    (request) => {
+    ({ request }) => {
       const url = new URL(request.url);
       return new Response(`Hello, ${url.searchParams.get("name") ?? "World"}!`);
     },
