@@ -1,6 +1,8 @@
 import type { Route } from "@std/http/unstable-route";
 import { route } from "@std/http/unstable-route";
 
+export type { Route };
+
 export type HandleRequest = (
   request: Request,
   params: URLPatternResult | undefined,
