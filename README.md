@@ -9,9 +9,9 @@ Minimal HTTP router library based on the
 ## Usage
 
 ```ts
-import { createRouter } from "@fartlabs/rt";
+import { Router } from "@fartlabs/rt";
 
-const router = createRouter()
+const router = new Router()
   .get("/", () => new Response("Hello, World!"))
   .default(() => new Response("Not found", { status: 404 }));
 

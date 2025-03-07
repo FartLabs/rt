@@ -4,9 +4,11 @@ import { route } from "@std/http/unstable-route";
 export type { Route };
 
 export type HandleRequest = (
-  request: Request,
-  params: URLPatternResult | undefined,
-  info: Deno.ServeHandlerInfo<Deno.Addr> | undefined,
+  request: Parameters<Route["handler"]>[0],
+  params: Parameters<Route["handler"]>[1],
+  info: Parameters<Route["handler"]>[2],
+  // next: () => Promise<Response>,
+  // state: TState
 ) => Response | Promise<Response>;
 
 export type HandleDefault = () => Response | Promise<Response>;
@@ -24,7 +26,9 @@ function handleError(error: Error) {
 /**
  * Router is an HTTP router based on the `URLPattern` API.
  */
-export class Router {
+export class Router<TState> {
+  public defaultState?: () => TState;
+
   public constructor(
     public routes: Route[] = [],
     public handleDefault?: HandleDefault,
@@ -36,11 +40,7 @@ export class Router {
    */
   public async fetch(request: Request): Promise<Response> {
     try {
-      const handle = route(
-        this.routes,
-        this.handleDefault ?? handleDefault,
-      );
-      return await handle(request);
+      return await this.execute(0, request);
     } catch (error) {
       if (error instanceof Error) {
         return await (this.handleError ?? handleError)(error);
@@ -48,6 +48,40 @@ export class Router {
 
       throw error;
     }
+  }
+
+  /**
+   * execute executes a route at the given index.
+   */
+  private execute(
+    i: number,
+    request: Parameters<HandleRequest>[0],
+    info?: Parameters<HandleRequest>[2],
+  ): Response | Promise<Response> {
+    if (i >= this.routes.length) {
+      return (this.handleDefault ?? handleDefault)();
+    }
+
+    const next = () => this.execute(i + 1, request, info);
+    const handle = route(
+      [{
+        ...this.routes[i],
+        handler: (request, params, info) => {
+          return this.routes[i].handler(request, params, info); // , state, next);
+        },
+      }],
+      next,
+    );
+
+    return handle(request, info);
+  }
+
+  /**
+   * state sets the initial state of the router.
+   */
+  public state(defaultState: () => TState): this {
+    this.defaultState = defaultState;
+    return this;
   }
 
   /**
@@ -61,7 +95,7 @@ export class Router {
   /**
    * use appends a sequence of routers to the router.
    */
-  public use(data: Route[] | Router): this {
+  public use(data: Route[] | Router<TState>): this {
     if (data instanceof Router) {
       this.routes.push(...data.routes);
     } else {
