@@ -12,8 +12,9 @@ interface User {
 const router = new Router<State>()
   .get(
     "/*",
-    async ({ next }) => {
-      return await next({ user: { name: "Wazoo" } });
+    async ({ next, state }) => {
+      state.user = state.user ?? { name: "Wazoo" };
+      return await next();
     },
   )
   .get(

@@ -9,7 +9,7 @@ export interface RtContext<TState> {
   request: Request;
   params: URLPatternResult | undefined;
   info: Deno.ServeHandlerInfo | undefined;
-  next: (state: TState) => Promise<Response>;
+  next: () => Promise<Response>;
   state: TState;
 }
 
@@ -46,14 +46,14 @@ export class Router<TState> {
   public async fetch(
     request: Request,
     info?: Deno.ServeHandlerInfo,
-    state?: TState,
+    state: TState = this.initializeState(),
   ): Promise<Response> {
     try {
       return await this.execute(
         0,
         request,
         info,
-        state ?? this.initializeState(),
+        state,
       );
     } catch (error) {
       if (error instanceof Error) {
@@ -77,8 +77,7 @@ export class Router<TState> {
       return (this.handleDefault ?? handleDefault)();
     }
 
-    const next = async (state: TState) =>
-      await this.execute(i + 1, request, info, state);
+    const next = async () => await this.execute(i + 1, request, info, state);
     const { method, pattern, handler } = this.routes[i];
     const handle = route(
       [
@@ -90,7 +89,7 @@ export class Router<TState> {
           },
         },
       ],
-      () => next(state),
+      () => next(),
     );
 
     return handle(request, info);
@@ -128,7 +127,7 @@ export class Router<TState> {
   /**
    * default sets the router's default handler.
    */
-  public default(handle: () => Response | Promise<Response>): this {
+  public default(handle: HandleDefault): this {
     this.handleDefault = handle;
     return this;
   }
@@ -136,7 +135,7 @@ export class Router<TState> {
   /**
    * error sets the router's error handler.
    */
-  public error(handle: (error: Error) => Response | Promise<Response>): this {
+  public error(handle: HandleError): this {
     this.handleError = handle;
     return this;
   }
