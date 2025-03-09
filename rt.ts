@@ -77,8 +77,8 @@ export class Router<TState> {
       return (this.handleDefault ?? handleDefault)();
     }
 
-    const next = async () => await this.execute(i + 1, request, info, state);
     const { method, pattern, handler } = this.routes[i];
+    const next = async () => await this.execute(i + 1, request, info, state);
     const handle = route(
       [
         {
@@ -89,7 +89,7 @@ export class Router<TState> {
           },
         },
       ],
-      () => next(),
+      next,
     );
 
     return handle(request, info);
