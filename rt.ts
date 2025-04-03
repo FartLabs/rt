@@ -2,7 +2,7 @@ import type { Route } from "@std/http/unstable-route";
 import { route } from "@std/http/unstable-route";
 
 export interface RtRoute<TState> extends Omit<Route, "handler"> {
-  handler: HandleRequest<TState>;
+  handler: RequestHandler<TState>;
 }
 
 export interface RtContext<TState> {
@@ -13,31 +13,31 @@ export interface RtContext<TState> {
   state: TState;
 }
 
-export type HandleRequest<TState> = (
+export type RequestHandler<TState> = (
   context: RtContext<TState>,
 ) => Response | Promise<Response>;
 
-export type HandleDefault = () => Response | Promise<Response>;
+export type DefaultHandler = () => Response | Promise<Response>;
 
-export type HandleError = (error: Error) => Response | Promise<Response>;
+export type ErrorHandler = (error: Error) => Response | Promise<Response>;
 
-function handleDefault() {
+function defaultHandler() {
   return new Response("Not found", { status: 404 });
 }
 
-function handleError(error: Error) {
+function errorHandler(error: Error) {
   return new Response(error.message, { status: 500 });
 }
 
 /**
  * Router is an HTTP router based on the `URLPattern` API.
  */
-export class Router<TState> {
+export class Router<TState = never> {
   public constructor(
     public routes: RtRoute<TState>[] = [],
     public initializeState: () => TState = () => ({} as TState),
-    public handleDefault?: HandleDefault,
-    public handleError?: HandleError,
+    public defaultHandler?: DefaultHandler,
+    public errorHandler?: ErrorHandler,
   ) {}
 
   /**
@@ -57,7 +57,7 @@ export class Router<TState> {
       );
     } catch (error) {
       if (error instanceof Error) {
-        return await (this.handleError ?? handleError)(error);
+        return await (this.errorHandler ?? errorHandler)(error);
       }
 
       throw error;
@@ -74,25 +74,25 @@ export class Router<TState> {
     state: TState,
   ): Response | Promise<Response> {
     if (i >= this.routes.length) {
-      return (this.handleDefault ?? handleDefault)();
+      return (this.defaultHandler ?? defaultHandler)();
     }
 
-    const { method, pattern, handler } = this.routes[i];
+    const { method, pattern, handler: execute } = this.routes[i];
     const next = async () => await this.execute(i + 1, request, info, state);
-    const handle = route(
+    const handler = route(
       [
         {
           method,
           pattern,
           handler: (request, params, info) => {
-            return handler({ request, params, info, next, state });
+            return execute({ request, params, info, next, state });
           },
         },
       ],
       next,
     );
 
-    return handle(request, info);
+    return handler(request, info);
   }
 
   /**
@@ -127,16 +127,16 @@ export class Router<TState> {
   /**
    * default sets the router's default handler.
    */
-  public default(handle: HandleDefault): this {
-    this.handleDefault = handle;
+  public default(handler: DefaultHandler): this {
+    this.defaultHandler = handler;
     return this;
   }
 
   /**
    * error sets the router's error handler.
    */
-  public error(handle: HandleError): this {
-    this.handleError = handle;
+  public error(handler: ErrorHandler): this {
+    this.errorHandler = handler;
     return this;
   }
 
@@ -145,12 +145,12 @@ export class Router<TState> {
    */
   public connect(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "CONNECT",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -159,12 +159,12 @@ export class Router<TState> {
    */
   public delete(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "DELETE",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -173,12 +173,12 @@ export class Router<TState> {
    */
   public get(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "GET",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -187,12 +187,12 @@ export class Router<TState> {
    */
   public head(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "HEAD",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -201,12 +201,12 @@ export class Router<TState> {
    */
   public options(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "OPTIONS",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -215,12 +215,12 @@ export class Router<TState> {
    */
   public patch(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "PATCH",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -229,12 +229,12 @@ export class Router<TState> {
    */
   public post(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "POST",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -243,12 +243,12 @@ export class Router<TState> {
    */
   public put(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "PUT",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 
@@ -257,12 +257,12 @@ export class Router<TState> {
    */
   public trace(
     pattern: string,
-    handle: HandleRequest<TState>,
+    handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "TRACE",
       pattern: new URLPattern({ pathname: pattern }),
-      handler: handle,
+      handler,
     });
   }
 }
