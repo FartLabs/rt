@@ -144,12 +144,14 @@ export class Router<TState = never> {
    * connect appends a router for the CONNECT method to the router.
    */
   public connect(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "CONNECT",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -158,12 +160,14 @@ export class Router<TState = never> {
    * delete appends a router for the DELETE method to the router.
    */
   public delete(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "DELETE",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -172,12 +176,14 @@ export class Router<TState = never> {
    * get appends a router for the GET method to the router.
    */
   public get(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "GET",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -186,12 +192,14 @@ export class Router<TState = never> {
    * head appends a router for the HEAD method to the router.
    */
   public head(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "HEAD",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -200,12 +208,14 @@ export class Router<TState = never> {
    * options appends a router for the OPTIONS method to the router.
    */
   public options(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "OPTIONS",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -214,12 +224,14 @@ export class Router<TState = never> {
    * patch appends a router for the PATCH method to the router.
    */
   public patch(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "PATCH",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -228,12 +240,14 @@ export class Router<TState = never> {
    * post appends a router for the POST method to the router.
    */
   public post(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "POST",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -242,12 +256,14 @@ export class Router<TState = never> {
    * put appends a router for the PUT method to the router.
    */
   public put(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "PUT",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
@@ -256,12 +272,14 @@ export class Router<TState = never> {
    * trace appends a router for the TRACE method to the router.
    */
   public trace(
-    pattern: string,
+    pattern: string | URLPattern,
     handler: RequestHandler<TState>,
   ): this {
     return this.with({
       method: "TRACE",
-      pattern: new URLPattern({ pathname: pattern }),
+      pattern: pattern instanceof URLPattern
+        ? pattern
+        : new URLPattern({ pathname: pattern }),
       handler,
     });
   }
