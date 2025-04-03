@@ -31,7 +31,7 @@ deno init
 3\. Add rt as a project dependency.
 
 ```sh
-deno add @fartlabs/rt
+deno add jsr:@fartlabs/rt
 ```
 
 ## Contribute
