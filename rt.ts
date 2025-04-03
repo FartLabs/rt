@@ -1,7 +1,8 @@
 import type { Route } from "@std/http/unstable-route";
 import { route } from "@std/http/unstable-route";
 
-export interface RtRoute<TState> extends Omit<Route, "handler"> {
+export interface RtRoute<TState> extends Omit<Route, "handler" | "pattern"> {
+  pattern: string | URLPattern;
   handler: RequestHandler<TState>;
 }
 
@@ -83,7 +84,9 @@ export class Router<TState = never> {
       [
         {
           method,
-          pattern,
+          pattern: pattern instanceof URLPattern
+            ? pattern
+            : new URLPattern({ pathname: pattern }),
           handler: (request, params, info) => {
             return execute({ request, params, info, next, state });
           },
@@ -104,10 +107,18 @@ export class Router<TState = never> {
   }
 
   /**
-   * with appends a route to the router.
+   * default sets the router's default handler.
    */
-  public with(route: RtRoute<TState>): this {
-    this.routes.push(route);
+  public default(handler: DefaultHandler): this {
+    this.defaultHandler = handler;
+    return this;
+  }
+
+  /**
+   * error sets the router's error handler.
+   */
+  public error(handler: ErrorHandler): this {
+    this.errorHandler = handler;
     return this;
   }
 
@@ -125,18 +136,10 @@ export class Router<TState = never> {
   }
 
   /**
-   * default sets the router's default handler.
+   * with appends a route to the router.
    */
-  public default(handler: DefaultHandler): this {
-    this.defaultHandler = handler;
-    return this;
-  }
-
-  /**
-   * error sets the router's error handler.
-   */
-  public error(handler: ErrorHandler): this {
-    this.errorHandler = handler;
+  public with(route: RtRoute<TState>): this {
+    this.routes.push(route);
     return this;
   }
 
@@ -149,9 +152,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "CONNECT",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -165,9 +166,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "DELETE",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -181,9 +180,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "GET",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -197,9 +194,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "HEAD",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -213,9 +208,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "OPTIONS",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -229,9 +222,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "PATCH",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -245,9 +236,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "POST",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -261,9 +250,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "PUT",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
@@ -277,9 +264,7 @@ export class Router<TState = never> {
   ): this {
     return this.with({
       method: "TRACE",
-      pattern: pattern instanceof URLPattern
-        ? pattern
-        : new URLPattern({ pathname: pattern }),
+      pattern,
       handler,
     });
   }
